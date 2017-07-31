@@ -154,7 +154,10 @@ abstract class AbstractContentViewHelper extends AbstractViewHelper
         if (true === (boolean) $this->arguments['sectionIndexOnly']) {
             $conditions .= ' AND sectionIndex = 1';
         }
-        if (ExtensionManagementUtility::isLoaded('workspaces')) {
+
+        // @note If we're doing a workspace preview, appropriate conditions are already in place.
+        // The call to BackendUtility may not be needed at tall, but that requires more testing.
+        if (ExtensionManagementUtility::isLoaded('workspaces') && !$GLOBALS['TSFE']->doWorkspacePreview()) {
             $conditions .= BackendUtility::versioningPlaceholderClause('tt_content');
         }
 
@@ -164,10 +167,17 @@ abstract class AbstractContentViewHelper extends AbstractViewHelper
             return $rows;
         }
 
-        $workspaceId = isset($GLOBALS['BE_USER']) ? $GLOBALS['BE_USER']->workspace : 0;
+        // @note Previously we only had the else case.  Pretty sure that the TSFE call accounts for both preview and
+        // for backend users so that is the only call needed.
+        if ($GLOBALS['TSFE']->doWorkspacePreview()) {
+            $workspaceId = $GLOBALS['TSFE']->whichWorkspace();
+        } else {
+            $workspaceId = isset($GLOBALS['BE_USER']) ? $GLOBALS['BE_USER']->workspace : 0;
+        }
         if ($workspaceId) {
             foreach ($rows as $index => $row) {
-                if (BackendUtility::getMovePlaceholder('tt_content', $row['uid'])) {
+                // @note Passing the workspace ID in now.
+                if (BackendUtility::getMovePlaceholder('tt_content', $row['uid'], '*', $workspaceId)) {
                     unset($rows[$index]);
                 } else {
                     $rows[$index] = $row;
